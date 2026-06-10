@@ -1,13 +1,13 @@
 {
-  "name": "msfw",
+  "name": "xuf",
   "version": "1.0.0",
-  "description": "MSFW",
-  "repository": "https://github.com/xingbangzhou/msfw.git",
+  "description": "XUN Framework",
+  "repository": "https://github.com/xingbangzhou/xuf.git",
   "author": "zhouxingbang <zhouxingbang92@163.com>",
   "license": "MIT",
   "private": true,
   "scripts": {
-    "release": "pnpm --filter \"@msfw/*\" release",
+    "release": "pnpm --filter \"@xuf/*\" release",
     "prepare": "husky install",
     "lint": "eslint --fix --ext .ts,.tsx ."
   },
@@ -26,7 +26,7 @@
     "@babel/preset-typescript": "^7.24.7",
     "@commitlint/cli": "^19.4.0",
     "@commitlint/config-conventional": "^19.2.2",
-    "@msfw/eslint-config": "workspace:^",
+    "@xuf/eslint-config": "workspace:^",
     "@types/node": "^22.5.1",
     "cross-env": "^7.0.3",
     "fast-glob": "^3.3.2",
@@ -34,6 +34,7 @@
     "husky": "^9.1.5",
     "rimraf": "^6.0.1",
     "typescript": "^5.6.2",
+    "eslint": "^8.56.0",
     "yargs": "^17.7.2"
   }
 }

@@ -1,0 +1,24 @@
+{
+  "name": "@xuf/tsconfig",
+  "version": "1.0.0",
+  "main": "",
+  "license": "MIT",
+  "types": "types/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xingbangzhou/xuf.git",
+    "directory": "packages/xuf-tsconfig"
+  },
+  "maintainers": [
+    "xingbangzhou"
+  ],
+  "scripts": {
+    "release": "pnpm publish --access public --no-git-checks"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "typescript-plugin-css-modules": "^5.1.0"
+  }
+}

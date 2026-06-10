@@ -1,0 +1,10 @@
+{
+  "extends": "@xuf/tsconfig",
+  "compilerOptions": {
+    "types": ["node", "react", "@xuf/tsconfig"],
+    "baseUrl": ".",
+    "paths": {
+      "src/*": ["src/*"],
+    },
+  }
+}

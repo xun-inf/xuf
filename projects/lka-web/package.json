@@ -1,0 +1,28 @@
+{
+  "name": "main",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "xuf dev",
+    "build": "xuf build",
+    "build:dev": "xuf build --env dev",
+    "build:analyze": "xuf build --analyze",
+    "start": "xuf serve"
+  },
+  "devDependencies": {
+    "@xuf/cli": "workspace:^",
+    "@xuf/tsconfig": "workspace:^",
+    "@types/node": "^22.5.1",
+    "@types/react": "^18.3.4",
+    "@types/react-dom": "^18.3.0",
+    "typescript-plugin-css-modules": "^5.1.0"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.25.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router": "^6.26.1",
+    "react-router-dom": "^6.26.1"
+  }
+}
