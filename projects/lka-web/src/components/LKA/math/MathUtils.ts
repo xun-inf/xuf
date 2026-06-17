@@ -35,4 +35,20 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
 }
 
-export {generateUUID, clamp}
+function equalArray<T>(a: ArrayLike<T>, b: ArrayLike<T>): boolean {
+  if (a.length !== b.length) return false
+
+  for (let i = 0, l = a.length; i < l; i++) {
+    if (a[i] !== b[i]) return false
+  }
+
+  return true
+}
+
+function copyArray<T>(a: Array<T>, b: ArrayLike<T>): void {
+  for (let i = 0, l = b.length; i < l; i++) {
+    a[i] = b[i]
+  }
+}
+
+export {generateUUID, clamp, equalArray, copyArray}
