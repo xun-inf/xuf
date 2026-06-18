@@ -1,4 +1,4 @@
-import {ShaderChunkRegistry, IncludeResolver} from './ShaderChunkRegistry'
+import {ShaderChunkRegistry, IncludeResolver} from './ShaderLib'
 import {UniformsLib, type UniformMap} from './UniformsLib'
 
 export type ShaderStage = 'vertex' | 'fragment'

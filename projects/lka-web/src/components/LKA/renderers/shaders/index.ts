@@ -1,4 +1,4 @@
-export {ShaderChunkRegistry, IncludeResolver} from './ShaderChunkRegistry'
+export {ShaderChunkRegistry, IncludeResolver} from './ShaderLib'
 export {UniformsLib, type UniformValue, type UniformMap} from './UniformsLib'
 export {
   ShaderBuilder,
@@ -12,4 +12,4 @@ export {
   type ShaderVariant,
   type Precision,
 } from './ShaderBuilder'
-export {createShaderBuilder, buildShader} from './ymatChunks'
+export {createShaderBuilder, buildShader} from './ymatShader'
