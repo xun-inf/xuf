@@ -297,7 +297,7 @@ vec4 blend_luminosity(vec4 src) {
   return vec4(rgb, a);
 }
 
-vec4 blend_cvt(vec4 src) {
+vec4 blendRGBA(vec4 src) {
   int mode = blendMode;
 
 #ifdef USE_BLEND_ADD

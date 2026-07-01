@@ -2,10 +2,9 @@
 export default /* glsl */ `
 #include <common>
 
+#include <hsbc_pars_fragment>
 #include <mask_pars_fragment>
 #include <blend_pars_fragment>
-#include <hsv_pars_fragment>
-#include <bricon_pars_fragment>
 
 void main(void) {
   gl_FragColor = texture2D(texture, v_texcoord);
@@ -22,8 +21,7 @@ void main(void) {
   }
   gl_FragColor = gl_FragColor * alpha;
 
-  #include <bricon_fragment>
-  #include <hsv_fragment>
+  #include <hsbc_fragment>
   #include <mask_fragment>
   #include <blend_fragment>
 }

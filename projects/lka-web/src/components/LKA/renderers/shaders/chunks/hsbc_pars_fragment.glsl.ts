@@ -1,8 +1,9 @@
-/** HSV / RGB 互转工具函数 */
+/** 亮度和对比度 / HSV / RGB 互转工具函数 */
 export default /* glsl */ `
-#ifdef USE_HUE_SAT
+#ifdef USE_HSBC
 uniform int colorize;
-uniform vec3 hsl;               // x=hue, y=saturation, z=lightness
+uniform vec3 hsl;               // x=hue, y=saturation, z=lightness 
+uniform vec2 brtCnt;           // x=brightness, y=contrast
 
 #define EPSILON 1e-10
 vec3 saturate(vec3 v) { return clamp(v, vec3(0.0), vec3(1.0)); }
@@ -33,7 +34,7 @@ vec3 HSV2RGB(vec3 HSV) {
   return ((RGB - 1.0) * HSV.y + 1.0) * HSV.z;
 }
 
-vec4 hsv_cvt(vec4 src) {
+vec4 hsvRGB(vec4 src) {
   if (colorize == 0) {
     return src;
   }
@@ -54,5 +55,20 @@ vec4 hsv_cvt(vec4 src) {
 
   return vec4(rgbColor * src.a, src.a);
 }
+
+vec4 brtcntRGB(vec4 src) {
+  vec3 rgb = src.rgb * brtCnt.y + 0.5 - brtCnt.y * 0.5;
+  if (brtCnt.x == 0.0) {
+    return src;
+  }
+
+  vec3 hsv = RGB2HSV(rgb);
+  hsv.z *= (brtCnt.x + 1.0);
+  rgb = HSV2RGB(hsv);
+  rgb += (brtCnt.x / 2.0);
+
+  return vec4(rgb * src.a, src.a);
+}
+
 #endif
 `

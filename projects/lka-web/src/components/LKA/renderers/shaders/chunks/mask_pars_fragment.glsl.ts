@@ -51,7 +51,7 @@ vec4 mask_luma_inverted(vec4 src) {
   return src * luma;
 }
 
-vec4 mask_cvt(vec4 src) {
+vec4 maskRGBA(vec4 src) {
   int mode = maskMode;
 
   if (mode == 1) return mask_alpha(src);

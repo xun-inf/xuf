@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mask Path / Feather Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e8edf7;
+      background: #10131a;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    .panel,
+    .stage,
+    .note {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel {
+      padding: 20px;
+    }
+
+    .stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 560px;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .subtitle {
+      margin: 0 0 20px;
+      color: #aeb8ca;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .control {
+      margin: 18px 0;
+    }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      color: #d8e1f2;
+      font-size: 14px;
+    }
+
+    input[type="range"],
+    select {
+      width: 100%;
+    }
+
+    input[type="checkbox"] {
+      transform: translateY(1px);
+    }
+
+    select {
+      height: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: #e8edf7;
+      background: #1c2230;
+      padding: 0 10px;
+    }
+
+    canvas {
+      width: 480px;
+      height: 360px;
+      border-radius: 12px;
+      background: #20242d;
+      image-rendering: auto;
+    }
+
+    .note {
+      grid-column: 1 / -1;
+      padding: 16px 20px;
+      color: #b8c3d7;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .state {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      color: #cdd7e9;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="panel">
+      <h1>Mask Path / Feather Demo</h1>
+      <p class="subtitle">
+        用 Canvas 2D 验证 PAG Mask 的两条路径：普通 path clip，以及 ImageData alpha Gaussian feather。
+      </p>
+
+      <div class="control">
+        <label for="mode">渲染模式 <span id="modeValue">auto</span></label>
+        <select id="mode">
+          <option value="auto">auto</option>
+          <option value="path">path</option>
+          <option value="feather">feather</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="shape">Mask 形状 <span id="shapeValue">ellipse</span></label>
+        <select id="shape">
+          <option value="ellipse">ellipse</option>
+          <option value="rect">rect</option>
+          <option value="polygon">polygon</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="featherX">featherX <span id="featherXValue">24</span></label>
+        <input id="featherX" type="range" min="0" max="80" step="1" value="24" />
+      </div>
+
+      <div class="control">
+        <label for="featherY">featherY <span id="featherYValue">24</span></label>
+        <input id="featherY" type="range" min="0" max="80" step="1" value="24" />
+      </div>
+
+      <div class="control">
+        <label for="opacity">opacity <span id="opacityValue">1.00</span></label>
+        <input id="opacity" type="range" min="0" max="1" step="0.01" value="1" />
+      </div>
+
+      <div class="control">
+        <label for="expansion">expansion <span id="expansionValue">0</span></label>
+        <input id="expansion" type="range" min="-80" max="80" step="1" value="0" />
+      </div>
+
+      <div class="control">
+        <label><span>inverted</span><input id="inverted" type="checkbox" /></label>
+      </div>
+
+      <div id="state" class="state"></div>
+    </section>
+
+    <section class="stage">
+      <canvas id="demoCanvas" width="480" height="360"></canvas>
+    </section>
+
+    <section class="note">
+      feather 分支不使用 Canvas 内置滤镜。测试页按 PAG 的思路将 mask path 绘制到 alpha canvas，读取 ImageData 后执行横向/纵向可分离高斯卷积，参数映射为 <code>sigmaX = featherX / 2</code>、<code>sigmaY = featherY / 2</code>，再通过 <code>destination-in</code> 作用到内容图层。
+    </section>
+  </main>
+
+  <script type="module">
+    const canvas = document.getElementById('demoCanvas');
+    const ctx = canvas.getContext('2d');
+    const controls = {
+      mode: document.getElementById('mode'),
+      shape: document.getElementById('shape'),
+      featherX: document.getElementById('featherX'),
+      featherY: document.getElementById('featherY'),
+      opacity: document.getElementById('opacity'),
+      expansion: document.getElementById('expansion'),
+      inverted: document.getElementById('inverted'),
+    };
+    const labels = {
+      mode: document.getElementById('modeValue'),
+      shape: document.getElementById('shapeValue'),
+      featherX: document.getElementById('featherXValue'),
+      featherY: document.getElementById('featherYValue'),
+      opacity: document.getElementById('opacityValue'),
+      expansion: document.getElementById('expansionValue'),
+      state: document.getElementById('state'),
+    };
+
+    if (!ctx) {
+      throw new Error('Canvas 2D context is unavailable.');
+    }
+
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+    const createCanvas = (width, height) => {
+      const output = document.createElement('canvas');
+      output.width = Math.max(1, Math.ceil(width));
+      output.height = Math.max(1, Math.ceil(height));
+      return output;
+    };
+
+    const get2D = (target) => {
+      const context = target.getContext('2d');
+      if (!context) {
+        throw new Error('Canvas 2D context is unavailable.');
+      }
+      return context;
+    };
+
+    const ellipseMaskPath = [
+      { type: 'moveTo', values: [240, 42] },
+      { type: 'bezierCurveTo', values: [344, 42, 430, 104, 430, 180] },
+      { type: 'bezierCurveTo', values: [430, 256, 344, 318, 240, 318] },
+      { type: 'bezierCurveTo', values: [136, 318, 50, 256, 50, 180] },
+      { type: 'bezierCurveTo', values: [50, 104, 136, 42, 240, 42] },
+      { type: 'closePath' },
+    ];
+
+    const rectMaskPath = [
+      { type: 'moveTo', values: [86, 76] },
+      { type: 'lineTo', values: [394, 76] },
+      { type: 'lineTo', values: [394, 284] },
+      { type: 'lineTo', values: [86, 284] },
+      { type: 'closePath' },
+    ];
+
+    const polygonMaskPath = [
+      { type: 'moveTo', values: [240, 42] },
+      { type: 'lineTo', values: [430, 142] },
+      { type: 'lineTo', values: [356, 318] },
+      { type: 'lineTo', values: [124, 318] },
+      { type: 'lineTo', values: [50, 142] },
+      { type: 'closePath' },
+    ];
+
+    const getMaskPathCommands = (shape) => {
+      if (shape === 'rect') {
+        return rectMaskPath;
+      }
+      if (shape === 'polygon') {
+        return polygonMaskPath;
+      }
+      return ellipseMaskPath;
+    };
+
+    const getPathBounds = (commands) => {
+      const points = [];
+      for (const command of commands) {
+        const values = command.values || [];
+        for (let i = 0; i + 1 < values.length; i += 2) {
+          points.push([values[i], values[i + 1]]);
+        }
+      }
+      if (points.length === 0) {
+        return { width: 0, height: 0, centerX: 0, centerY: 0 };
+      }
+      const xs = points.map(([x]) => x);
+      const ys = points.map(([, y]) => y);
+      const left = Math.min(...xs);
+      const right = Math.max(...xs);
+      const top = Math.min(...ys);
+      const bottom = Math.max(...ys);
+      return {
+        width: right - left,
+        height: bottom - top,
+        centerX: (left + right) / 2,
+        centerY: (top + bottom) / 2,
+      };
+    };
+
+    const expandPoint = (x, y, bounds, expansion) => {
+      if (!expansion || bounds.width === 0 || bounds.height === 0) {
+        return [x, y];
+      }
+      const scaleX = Math.max(0.001, (bounds.width + expansion * 2) / bounds.width);
+      const scaleY = Math.max(0.001, (bounds.height + expansion * 2) / bounds.height);
+      return [bounds.centerX + (x - bounds.centerX) * scaleX, bounds.centerY + (y - bounds.centerY) * scaleY];
+    };
+
+    const buildPath2D = (commands, expansion) => {
+      const path = new Path2D();
+      const bounds = getPathBounds(commands);
+      for (const command of commands) {
+        switch (command.type) {
+          case 'moveTo': {
+            const [x, y] = expandPoint(command.values[0], command.values[1], bounds, expansion);
+            path.moveTo(x, y);
+            break;
+          }
+          case 'lineTo': {
+            const [x, y] = expandPoint(command.values[0], command.values[1], bounds, expansion);
+            path.lineTo(x, y);
+            break;
+          }
+          case 'bezierCurveTo': {
+            const [x1, y1] = expandPoint(command.values[0], command.values[1], bounds, expansion);
+            const [x2, y2] = expandPoint(command.values[2], command.values[3], bounds, expansion);
+            const [x3, y3] = expandPoint(command.values[4], command.values[5], bounds, expansion);
+            path.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+            break;
+          }
+          case 'quadraticCurveTo': {
+            const [x1, y1] = expandPoint(command.values[0], command.values[1], bounds, expansion);
+            const [x2, y2] = expandPoint(command.values[2], command.values[3], bounds, expansion);
+            path.quadraticCurveTo(x1, y1, x2, y2);
+            break;
+          }
+          case 'closePath':
+            path.closePath();
+            break;
+        }
+      }
+      return path;
+    };
+
+    const buildMaskPath = (mask) => {
+      const path = buildPath2D(getMaskPathCommands(mask.shape), mask.expansion);
+      if (!mask.inverted) {
+        return path;
+      }
+      const invertedPath = new Path2D();
+      invertedPath.rect(0, 0, canvas.width, canvas.height);
+      invertedPath.addPath(path);
+      return invertedPath;
+    };
+
+    const buildGaussianKernel = (sigma) => {
+      if (sigma <= 0) {
+        return new Float32Array([1]);
+      }
+      const radius = Math.max(1, Math.ceil(sigma * 3));
+      const kernel = new Float32Array(radius * 2 + 1);
+      const denominator = 2 * sigma * sigma;
+      let sum = 0;
+      for (let i = -radius; i <= radius; i++) {
+        const value = Math.exp(-(i * i) / denominator);
+        kernel[i + radius] = value;
+        sum += value;
+      }
+      for (let i = 0; i < kernel.length; i++) {
+        kernel[i] /= sum;
+      }
+      return kernel;
+    };
+
+    const convolveAlphaHorizontal = (source, width, height, kernel) => {
+      const radius = Math.floor(kernel.length / 2);
+      const output = new Float32Array(width * height);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let alpha = 0;
+          for (let k = -radius; k <= radius; k++) {
+            const sampleX = clamp(x + k, 0, width - 1);
+            alpha += source[(y * width + sampleX) * 4 + 3] * kernel[k + radius];
+          }
+          output[y * width + x] = alpha;
+        }
+      }
+      return output;
+    };
+
+    const convolveAlphaVertical = (source, width, height, kernel) => {
+      const radius = Math.floor(kernel.length / 2);
+      const output = new Uint8ClampedArray(width * height);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let alpha = 0;
+          for (let k = -radius; k <= radius; k++) {
+            const sampleY = clamp(y + k, 0, height - 1);
+            alpha += source[sampleY * width + x] * kernel[k + radius];
+          }
+          output[y * width + x] = clamp(Math.round(alpha), 0, 255);
+        }
+      }
+      return output;
+    };
+
+    const blurAlphaImageData = (imageData, sigmaX, sigmaY) => {
+      const { width, height, data } = imageData;
+      const horizontal = convolveAlphaHorizontal(data, width, height, buildGaussianKernel(sigmaX));
+      const blurredAlpha = convolveAlphaVertical(horizontal, width, height, buildGaussianKernel(sigmaY));
+      for (let i = 0; i < blurredAlpha.length; i++) {
+        const offset = i * 4;
+        data[offset] = 255;
+        data[offset + 1] = 255;
+        data[offset + 2] = 255;
+        data[offset + 3] = blurredAlpha[i];
+      }
+      return imageData;
+    };
+
+    const drawMaskPath = (targetCtx, mask) => {
+      targetCtx.save();
+      targetCtx.globalAlpha = mask.opacity;
+      targetCtx.fillStyle = '#fff';
+      targetCtx.fill(buildMaskPath(mask), 'evenodd');
+      targetCtx.restore();
+    };
+
+    const renderPathMask = (targetCtx, mask, drawContent) => {
+      targetCtx.save();
+      targetCtx.clip(buildMaskPath(mask), 'evenodd');
+      drawContent(targetCtx);
+      targetCtx.restore();
+    };
+
+    const renderFeatherMask = (targetCtx, mask, drawContent) => {
+      const contentCanvas = createCanvas(canvas.width, canvas.height);
+      const contentCtx = get2D(contentCanvas);
+      drawContent(contentCtx);
+
+      const maskCanvas = createCanvas(canvas.width, canvas.height);
+      const maskCtx = get2D(maskCanvas);
+      drawMaskPath(maskCtx, mask);
+      const imageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+      maskCtx.putImageData(blurAlphaImageData(imageData, mask.featherX / 2, mask.featherY / 2), 0, 0);
+
+      contentCtx.save();
+      contentCtx.globalCompositeOperation = 'destination-in';
+      contentCtx.drawImage(maskCanvas, 0, 0);
+      contentCtx.restore();
+
+      targetCtx.drawImage(contentCanvas, 0, 0);
+    };
+
+    const drawContent = (targetCtx) => {
+      const gradient = targetCtx.createLinearGradient(70, 70, 410, 290);
+      gradient.addColorStop(0, '#4f8cff');
+      gradient.addColorStop(0.55, '#9b5cff');
+      gradient.addColorStop(1, '#ff6a3d');
+      targetCtx.fillStyle = gradient;
+      targetCtx.fillRect(70, 70, 340, 220);
+
+      targetCtx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      targetCtx.fillRect(116, 116, 248, 128);
+      targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      targetCtx.lineWidth = 4;
+      targetCtx.strokeRect(116, 116, 248, 128);
+
+      targetCtx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      targetCtx.font = 'bold 42px sans-serif';
+      targetCtx.fillText('PAG Mask', 118, 190);
+
+      targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      targetCtx.lineWidth = 8;
+      targetCtx.strokeRect(96, 98, 288, 164);
+    };
+
+    const readMask = () => ({
+      shape: controls.shape.value,
+      featherX: Number(controls.featherX.value),
+      featherY: Number(controls.featherY.value),
+      opacity: Number(controls.opacity.value),
+      expansion: Number(controls.expansion.value),
+      inverted: controls.inverted.checked,
+    });
+
+    const hasFeatherOrOpacity = (mask) => mask.featherX !== 0 || mask.featherY !== 0 || mask.opacity !== 1;
+
+    const render = () => {
+      const mask = readMask();
+      const mode = controls.mode.value;
+      labels.mode.textContent = mode;
+      labels.shape.textContent = mask.shape;
+      labels.featherX.textContent = String(mask.featherX);
+      labels.featherY.textContent = String(mask.featherY);
+      labels.opacity.textContent = mask.opacity.toFixed(2);
+      labels.expansion.textContent = String(mask.expansion);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#20242d';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const actualMode = mode === 'auto' ? (hasFeatherOrOpacity(mask) ? 'feather' : 'path') : mode;
+      if (actualMode === 'feather') {
+        renderFeatherMask(ctx, mask, drawContent);
+      } else {
+        renderPathMask(ctx, mask, drawContent);
+      }
+
+      labels.state.textContent = JSON.stringify({ mode, actualMode, ...mask, sigmaX: mask.featherX / 2, sigmaY: mask.featherY / 2 }, null, 2);
+    };
+
+    for (const control of Object.values(controls)) {
+      control.addEventListener('input', render);
+      control.addEventListener('change', render);
+    }
+
+    render();
+  </script>
+</body>
+</html>

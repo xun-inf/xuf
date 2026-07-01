@@ -4,10 +4,8 @@ import mask_pars_fragment from './chunks/mask_pars_fragment.glsl'
 import mask_fragment from './chunks/mask_fragment.glsl'
 import blend_pars_fragment from './chunks/blend_pars_fragment.glsl'
 import blend_fragment from './chunks/blend_fragment.glsl'
-import hsv_pars_fragment from './chunks/hsv_pars_fragment.glsl'
-import hsv_fragment from './chunks/hsv_fragment.glsl'
-import bricon_pars_fragment from './chunks/bricon_pars_fragment.glsl'
-import bricon_fragment from './chunks/bricon_fragment.glsl'
+import hsbc_pars_fragment from './chunks/hsbc_pars_fragment.glsl'
+import hsbc_fragment from './chunks/hsbc_fragment.glsl'
 import vertexShader from './chunks/ymat_vertex.glsl'
 import fragmentShader from './chunks/ymat_fragment.glsl'
 import { Matrix4 } from '../../math/Matrix4'
@@ -23,10 +21,8 @@ export function registerChunks(builder: ShaderBuilder): void {
   chunks.register('mask_fragment', mask_fragment)
   chunks.register('blend_pars_fragment', blend_pars_fragment)
   chunks.register('blend_fragment', blend_fragment)
-  chunks.register('hsv_pars_fragment', hsv_pars_fragment)
-  chunks.register('hsv_fragment', hsv_fragment)
-  chunks.register('bricon_pars_fragment', bricon_pars_fragment)
-  chunks.register('bricon_fragment', bricon_fragment)
+  chunks.register('hsbc_pars_fragment', hsbc_pars_fragment)
+  chunks.register('hsbc_fragment', hsbc_fragment)
 }
 
 // ===== 构建选项与 API =====
@@ -53,9 +49,9 @@ export function createShaderBuilder(): ShaderBuilder {
 
   // 颜色调整
   builder.uniforms.register('color_adjust', {
-    bricon: {value: {x: 0.0, y: 0.0}},
     colorize: {value: 0},
     hsl: {value: {x: 0.0, y: 0.0, z: 0.0}},
+    brtCnt: {value: {x: 0.0, y: 0.0}},
   })
 
   // 顶点
@@ -68,8 +64,7 @@ export function createShaderBuilder(): ShaderBuilder {
 
 /** 全部功能 defines（所有混合模式 + 色相饱和度 + 亮度对比度） */
 const ALL_DEFINES: Record<string, boolean> = {
-  USE_BRI_CON: true,
-  USE_HUE_SAT: true,
+  USE_HSBC: true,
   USE_BLEND: true,
   USE_BLEND_UTILS: true,
   USE_BLEND_ADD: true,
