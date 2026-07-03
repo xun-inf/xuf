@@ -1,6 +1,11 @@
-import {Camera} from '../cameras/Camera'
+import { Camera } from '../cameras/Camera'
+import { Object3D } from '../core/Object3D'
 import {Vector4} from '../math/Vector4'
 import {createCanvasElement} from '../utils'
+import {WebGLRenderTarget} from './WebGLRenderTarget'
+import {WebGLInfo} from './webgl/WebGLInfo'
+import {WebGLState} from './webgl/WebGLState'
+import {WebGLTextures} from './webgl/WebGLTextures'
 
 export interface WebGLRendererParameters {
   canvas?: HTMLCanvasElement | OffscreenCanvas
@@ -35,20 +40,30 @@ export class WebGLRenderer {
     canvas.addEventListener('webglcontextcreationerror', this.onContextCreationError, false)
 
     this._gl = canvas.getContext('webgl2', {
-      alpha: true,
+      alpha,
+      premultipliedAlpha,
     }) as WebGL2RenderingContext
 
-    this.initContext()
+    this.info = new WebGLInfo(this._gl)
+    this._state = new WebGLState(this._gl)
+    this._textures = new WebGLTextures(this._gl, this.info)
+
+    this.initGLContext()
   }
 
   readonly canvas: HTMLCanvasElement | OffscreenCanvas
+  readonly info: WebGLInfo
 
   private _gl: WebGL2RenderingContext
+  private _state: WebGLState
+  private _textures: WebGLTextures
   private _isContextLost = false
   private _width: number
   private _height: number
   private _pixelRatio: number
   private _viewport: Vector4
+  /** 当前绑定的离屏渲染目标，null 表示默认帧缓冲（canvas） */
+  private _currentRenderTarget: WebGLRenderTarget | null = null
 
   getContext() {
     return this._gl
@@ -75,6 +90,40 @@ export class WebGLRenderer {
 
   setViewport(x: number, y: number, width: number, height: number) {
     this._viewport.set(x, y, width, height)
+
+    if (this._currentRenderTarget === null) {
+      this._state.viewport(x, y, width, height)
+    }
+  }
+
+  /**
+   * 设置渲染目标：传入 RenderTarget 则渲染到其 framebuffer，传 null 恢复到 canvas。
+   */
+  setRenderTarget(renderTarget: WebGLRenderTarget | null): void {
+    const gl = this._gl
+    this._currentRenderTarget = renderTarget
+
+    if (renderTarget !== null) {
+      this._textures.setupRenderTarget(renderTarget)
+      this._state.bindFramebuffer(gl.FRAMEBUFFER, this._textures.getFramebuffer(renderTarget))
+      this._state.viewport(0, 0, renderTarget.width, renderTarget.height)
+    } else {
+      this._state.bindFramebuffer(gl.FRAMEBUFFER, null)
+      const v = this._viewport
+      this._state.viewport(v.x, v.y, v.z, v.w)
+    }
+  }
+
+  getRenderTarget(): WebGLRenderTarget | null {
+    return this._currentRenderTarget
+  }
+
+  getState(): WebGLState {
+    return this._state
+  }
+
+  clear(color = true, depth = false, stencil = false): void {
+    this._state.clear(color, depth, stencil)
   }
 
   dispose() {
@@ -85,11 +134,15 @@ export class WebGLRenderer {
     canvas.removeEventListener('webglcontextcreationerror', this.onContextCreationError, false)
   }
 
-  render() {
+  renderObject(object: Object3D, camera: Camera) {
     if (this._isContextLost === true) return
   }
 
-  private initContext() {}
+  private initGLContext() {
+    this._state.reset()
+    this._state.init()
+    this.setRenderTarget(this._currentRenderTarget)
+  }
 
   private onContextLost = (event: Event) => {
     console.log('Ly3D.WebGLRenderer: Context Lost.')
@@ -104,7 +157,7 @@ export class WebGLRenderer {
 
     this._isContextLost = false
 
-    this.initContext()
+    this.initGLContext()
   }
 
   private onContextCreationError = (event: Event) => {

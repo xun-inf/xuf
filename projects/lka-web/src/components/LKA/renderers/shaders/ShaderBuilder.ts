@@ -54,11 +54,7 @@ export function generateDefines(defines: ShaderVariant): string {
 // ===== Step 3: buildPrefix =====
 // 参考 three.js prefixVertex/prefixFragment — defines + GLSL 300 es 别名 + 内置声明
 
-export function buildPrefix(
-  stage: ShaderStage,
-  precision: Precision,
-  definesString: string,
-): string {
+export function buildPrefix(stage: ShaderStage, precision: Precision, definesString: string): string {
   const precisionBlock = generatePrecision(precision)
 
   if (stage === 'vertex') {
@@ -122,9 +118,7 @@ export function unrollLoops(source: string): string {
     const end = parseInt(endStr)
 
     for (let i = start; i < end; i++) {
-      result += snippet
-        .replace(/\[\s*i\s*\]/g, '[ ' + i + ' ]')
-        .replace(/UNROLLED_LOOP_INDEX/g, String(i))
+      result += snippet.replace(/\[\s*i\s*\]/g, '[ ' + i + ' ]').replace(/UNROLLED_LOOP_INDEX/g, String(i))
     }
 
     return result

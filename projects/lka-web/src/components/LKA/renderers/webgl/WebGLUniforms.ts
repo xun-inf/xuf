@@ -1,4 +1,6 @@
 import {equalArray, copyArray} from '../../math/MathUtils'
+import type {Texture} from '../../textures/Texture'
+import type {WebGLTextures} from './WebGLTextures'
 
 type UniformId = string | number
 type VectorLike2 = {x: number; y: number}
@@ -25,7 +27,7 @@ class UniformNode {
     this.cache = []
   }
 
-  setValue!: (gl: WebGL2RenderingContext, value: any) => void
+  setValue!: (gl: WebGL2RenderingContext, value: any, textures?: WebGLTextures) => void
 }
 
 function setValuef(this: UniformNode, gl: WebGL2RenderingContext, v: number): void {
@@ -256,6 +258,32 @@ function setValueV4i(this: UniformNode, gl: WebGL2RenderingContext, v: VectorLik
   }
 }
 
+// Sampler (texture) uniform：分配纹理单元 → 上传/绑定纹理 → uniform1i 写入单元号
+
+function setValueT1(this: UniformNode, gl: WebGL2RenderingContext, v: Texture, textures?: WebGLTextures): void {
+  if (textures === undefined) {
+    console.warn(`[LKA] WebGLUniforms: sampler uniform "${this.id}" requires a texture binder.`)
+    return
+  }
+
+  if (v === null || v.isTexture !== true) {
+    console.warn(`[LKA] WebGLUniforms: sampler uniform "${this.id}" expects a Texture value.`)
+    return
+  }
+
+  const cache = this.cache
+  const unit = textures.allocateTextureUnit()
+
+  // uniform1i 写入纹理单元号（带缓存）
+  if (cache[0] !== unit) {
+    gl.uniform1i(this.addr, unit)
+    cache[0] = unit
+  }
+
+  // 上传（若需要）并绑定纹理到该单元
+  textures.setTexture2D(v, unit)
+}
+
 function getSingularSetter(type: number) {
   switch (type) {
     case 0x1406:
@@ -271,6 +299,13 @@ function getSingularSetter(type: number) {
       return setValueM3 // _MAT3
     case 0x8b5c:
       return setValueM4 // _MAT4
+
+    case 0x8b5e: // SAMPLER_2D
+    case 0x8d66: // SAMPLER_EXTERNAL_OES
+    case 0x8dca: // INT_SAMPLER_2D
+    case 0x8dd2: // UNSIGNED_INT_SAMPLER_2D
+    case 0x8b62: // SAMPLER_2D_SHADOW
+      return setValueT1
 
     case 0x1404:
     case 0x8b56:
@@ -318,10 +353,10 @@ class WebGLUniforms {
 
   map: Record<UniformId, UniformNode>
 
-  setValue(gl: WebGL2RenderingContext, name: UniformId, value: any) {
+  setValue(gl: WebGL2RenderingContext, name: UniformId, value: any, textures?: WebGLTextures) {
     const u = this.map[name]
 
-    if (u !== undefined) u.setValue(gl, value)
+    if (u !== undefined) u.setValue(gl, value, textures)
   }
 }
 

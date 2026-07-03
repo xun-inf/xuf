@@ -12,4 +12,4 @@ export {
   type ShaderVariant,
   type Precision,
 } from './ShaderBuilder'
-export {createShaderBuilder, buildShader} from './ymatShader'
+export {createShaderBuilder, buildShader} from './lkaShader'

@@ -300,54 +300,22 @@ vec4 blend_luminosity(vec4 src) {
 vec4 blendRGBA(vec4 src) {
   int mode = blendMode;
 
-#ifdef USE_BLEND_ADD
   if(mode == 1) return blend_add(src);
-#endif
-#ifdef USE_BLEND_SCREEN
   if(mode == 2) return blend_screen(src);
-#endif
-#ifdef USE_BLEND_OVERLAY
   if(mode == 3) return blend_overlay(src);
-#endif
-#ifdef USE_BLEND_SOFT_LIGHT
   if(mode == 4) return blend_soft_light(src);
-#endif
-#ifdef USE_BLEND_LIGHTEN
   if(mode == 5) return blend_lighten(src);
-#endif
-#ifdef USE_BLEND_DARKEN
   if(mode == 6) return blend_darken(src);
-#endif
-#ifdef USE_BLEND_MULTIPLY
   if(mode == 7) return blend_multiply(src);
-#endif
-#ifdef USE_BLEND_COLOR_BURN
   if(mode == 8) return blend_color_burn(src);
-#endif
-#ifdef USE_BLEND_COLOR_DODGE
   if(mode == 9) return blend_color_dodge(src);
-#endif
-#ifdef USE_BLEND_HARD_LIGHT
   if(mode == 10) return blend_hard_light(src);
-#endif
-#ifdef USE_BLEND_DIFFERENCE
   if(mode == 11) return blend_difference(src);
-#endif
-#ifdef USE_BLEND_EXCLUSION
   if(mode == 12) return blend_exclusion(src);
-#endif
-#ifdef USE_BLEND_HUE
   if(mode == 13) return blend_hue(src);
-#endif
-#ifdef USE_BLEND_SATURATION
   if(mode == 14) return blend_saturation(src);
-#endif
-#ifdef USE_BLEND_COLOR
   if(mode == 15) return blend_color(src);
-#endif
-#ifdef USE_BLEND_LUMINOSITY
   if(mode == 16) return blend_luminosity(src);
-#endif
 
   return src;
 }

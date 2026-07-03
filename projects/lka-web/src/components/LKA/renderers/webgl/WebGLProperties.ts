@@ -7,6 +7,10 @@
 export class WebGLProperties {
   private properties = new WeakMap<object, Record<string, unknown>>()
 
+  has(object: object): boolean {
+    return this.properties.has(object)
+  }
+
   get<T extends Record<string, unknown> = Record<string, unknown>>(object: object): T {
     let map = this.properties.get(object)
 
@@ -22,7 +26,7 @@ export class WebGLProperties {
     this.properties.delete(object)
   }
 
-  has(object: object): boolean {
-    return this.properties.has(object)
+  dispose() {
+    this.properties = new WeakMap()
   }
 }

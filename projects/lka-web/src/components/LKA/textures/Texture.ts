@@ -42,6 +42,9 @@ export class Texture extends EventDispatcher<TextureEventMap> {
   /** 手动 mipmap */
   mipmaps: unknown[] = []
 
+  /** 是否为 RenderTarget 的 color attachment（只分配显存、不上传像素） */
+  isRenderTargetTexture = false
+
   // ---- 采样参数 ----
   mapping: number
   wrapS: number
@@ -62,7 +65,7 @@ export class Texture extends EventDispatcher<TextureEventMap> {
   matrix = new Matrix3()
 
   // ---- GPU 上传控制 ----
-  generateMipmaps = true
+  generateMipmaps = false
   premultiplyAlpha = false
   flipY = true
   unpackAlignment = 4

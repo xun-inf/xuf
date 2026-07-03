@@ -1,4 +1,5 @@
 import {type BuiltShader} from '../shaders/ShaderBuilder'
+import type {WebGLInfo} from './WebGLInfo'
 import {WebGLUniforms} from './WebGLUniforms'
 
 /**
@@ -22,10 +23,12 @@ export interface CompiledProgram {
  */
 class WebGLPrograms {
   private gl: WebGL2RenderingContext
+  private info?: WebGLInfo
   private programs: Map<string, CompiledProgram> = new Map()
 
-  constructor(gl: WebGL2RenderingContext) {
+  constructor(gl: WebGL2RenderingContext, info?: WebGLInfo) {
     this.gl = gl
+    this.info = info
   }
 
   /**
@@ -53,6 +56,9 @@ class WebGLPrograms {
 
     // 写入缓存
     this.programs.set(cacheKey, compiled)
+    if (this.info !== undefined) {
+      this.info.memory.programs = this.programs.size
+    }
 
     return compiled
   }
@@ -71,6 +77,9 @@ class WebGLPrograms {
 
     this.deleteProgram(compiled)
     this.programs.delete(cacheKey)
+    if (this.info !== undefined) {
+      this.info.memory.programs = this.programs.size
+    }
 
     return true
   }
@@ -99,6 +108,9 @@ class WebGLPrograms {
     }
 
     this.programs.clear()
+    if (this.info !== undefined) {
+      this.info.memory.programs = 0
+    }
   }
 
   // ===== 编译 =====
@@ -184,8 +196,7 @@ class WebGLPrograms {
 
       const typeName = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment'
       console.error(
-        `[LKA] WebGLPrograms: ${typeName} shader compile failed.\n${info}\n` +
-          this.formatShaderSource(source),
+        `[LKA] WebGLPrograms: ${typeName} shader compile failed.\n${info}\n` + this.formatShaderSource(source),
       )
 
       gl.deleteShader(shader)

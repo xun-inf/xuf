@@ -8,7 +8,7 @@ import hsbc_pars_fragment from './chunks/hsbc_pars_fragment.glsl'
 import hsbc_fragment from './chunks/hsbc_fragment.glsl'
 import vertexShader from './chunks/ymat_vertex.glsl'
 import fragmentShader from './chunks/ymat_fragment.glsl'
-import { Matrix4 } from '../../math/Matrix4'
+import {Matrix4} from '../../math/Matrix4'
 
 /**
  * 注册主着色器所需的所有 GLSL 代码片段
@@ -66,23 +66,6 @@ export function createShaderBuilder(): ShaderBuilder {
 const ALL_DEFINES: Record<string, boolean> = {
   USE_HSBC: true,
   USE_BLEND: true,
-  USE_BLEND_UTILS: true,
-  USE_BLEND_ADD: true,
-  USE_BLEND_SCREEN: true,
-  USE_BLEND_OVERLAY: true,
-  USE_BLEND_SOFT_LIGHT: true,
-  USE_BLEND_LIGHTEN: true,
-  USE_BLEND_DARKEN: true,
-  USE_BLEND_MULTIPLY: true,
-  USE_BLEND_COLOR_BURN: true,
-  USE_BLEND_COLOR_DODGE: true,
-  USE_BLEND_HARD_LIGHT: true,
-  USE_BLEND_DIFFERENCE: true,
-  USE_BLEND_EXCLUSION: true,
-  USE_BLEND_HUE: true,
-  USE_BLEND_SATURATION: true,
-  USE_BLEND_COLOR: true,
-  USE_BLEND_LUMINOSITY: true,
 }
 
 export function buildShader(builder: ShaderBuilder) {

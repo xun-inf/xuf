@@ -37,10 +37,25 @@ import type {DataTexture} from '../../textures/DataTexture'
 import type {VideoTexture} from '../../textures/VideoTexture'
 import type {TextureData} from '../../textures/Source'
 import {WebGLExtensions} from './WebGLExtensions'
+import type {WebGLInfo} from './WebGLInfo'
 import {WebGLProperties} from './WebGLProperties'
 
 interface TextureProperties extends Record<string, unknown> {
   __webglTexture?: WebGLTexture
+  __webglDisposeListener?: true
+}
+
+interface RenderTargetProperties extends Record<string, unknown> {
+  __webglFramebuffer?: WebGLFramebuffer
+  __webglDisposeListener?: true
+}
+
+interface RenderTargetLike {
+  width: number
+  height: number
+  texture: Texture
+  addEventListener(type: 'dispose', listener: (event: {target: RenderTargetLike | null}) => void): void
+  removeEventListener(type: 'dispose', listener: (event: {target: RenderTargetLike | null}) => void): void
 }
 
 const _size = /*@__PURE__*/ new Vector3()
@@ -57,6 +72,7 @@ export class WebGLTextures {
   private gl: WebGL2RenderingContext
   private extensions: WebGLExtensions
   private properties: WebGLProperties
+  private info: WebGLInfo
 
   private maxTextures: number
   private maxTextureSize: number
@@ -67,17 +83,64 @@ export class WebGLTextures {
   /** 当前渲染帧号 */
   frame = 0
 
+  /** 当前一轮 uniform 绑定中已分配的纹理单元数 */
+  private _usedTextureUnits = 0
+
   constructor(
     gl: WebGL2RenderingContext,
+    info: WebGLInfo,
     extensions: WebGLExtensions = new WebGLExtensions(gl),
     properties: WebGLProperties = new WebGLProperties(),
   ) {
     this.gl = gl
     this.extensions = extensions
     this.properties = properties
+    this.info = info
 
     this.maxTextures = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  }
+
+  private onTextureDispose = (event: {target: Texture | null}): void => {
+    const texture = event.target
+    if (texture === null) return
+
+    texture.removeEventListener('dispose', this.onTextureDispose)
+    this.dispose(texture)
+  }
+
+  private onRenderTargetDispose = (event: {target: RenderTargetLike | null}): void => {
+    const renderTarget = event.target
+    if (renderTarget === null) return
+
+    renderTarget.removeEventListener('dispose', this.onRenderTargetDispose)
+    this.disposeRenderTarget(renderTarget)
+  }
+
+  // ===== 纹理单元分配 =====
+
+  /**
+   * 重置纹理单元分配计数，应在每次 useProgram/绑定 uniform 之前调用
+   */
+  resetTextureUnits(): void {
+    this._usedTextureUnits = 0
+  }
+
+  /**
+   * 分配下一个可用纹理单元
+   */
+  allocateTextureUnit(): number {
+    const unit = this._usedTextureUnits
+
+    if (unit >= this.maxTextures) {
+      console.warn(
+        `[LKA] WebGLTextures: Trying to use ${unit + 1} texture units while this GPU supports only ${this.maxTextures}.`,
+      )
+    }
+
+    this._usedTextureUnits += 1
+
+    return unit
   }
 
   // ===== 入口 =====
@@ -98,7 +161,11 @@ export class WebGLTextures {
       const image = texture.image
 
       if (image === null) {
-        console.warn('[LKA] WebGLTextures: Texture marked for update but no image data found.')
+        // RenderTarget 纹理由 setupRenderTarget 分配显存，无 image，直接绑定
+        if (!texture.isRenderTargetTexture) {
+          console.warn('[LKA] WebGLTextures: Texture marked for update but no image data found.')
+        }
+        texture.needsUpdate = false
       } else {
         this.uploadTexture(textureProps, texture, slot)
         return
@@ -115,12 +182,93 @@ export class WebGLTextures {
   dispose(texture: Texture): void {
     const textureProps = this.properties.get<TextureProperties>(texture)
 
+    if (textureProps.__webglDisposeListener === true) {
+      texture.removeEventListener('dispose', this.onTextureDispose)
+    }
+
     if (textureProps.__webglTexture !== undefined) {
       this.gl.deleteTexture(textureProps.__webglTexture)
+      this.info.memory.textures = Math.max(0, this.info.memory.textures - 1)
     }
 
     this.properties.remove(texture)
     this.properties.remove(texture.source)
+  }
+
+  // ===== RenderTarget（离屏渲染目标 / Framebuffer） =====
+
+  /**
+   * 为 RenderTarget 分配 color 纹理显存并创建 framebuffer，幂等。
+   * Framebuffer 句柄挂在 RenderTarget 的 properties 上，而非 Texture。
+   */
+  setupRenderTarget(renderTarget: RenderTargetLike): void {
+    const gl = this.gl
+    const rtProps = this.properties.get<RenderTargetProperties>(renderTarget)
+
+    if (rtProps.__webglDisposeListener !== true) {
+      renderTarget.addEventListener('dispose', this.onRenderTargetDispose)
+      rtProps.__webglDisposeListener = true
+    }
+
+    if (rtProps.__webglFramebuffer !== undefined) return
+
+    const texture = renderTarget.texture
+    const textureProps = this.properties.get<TextureProperties>(texture)
+
+    // 1. 分配 color 纹理显存（data=null，只开空间不传数据）
+    this.initTexture(texture, textureProps)
+    gl.bindTexture(gl.TEXTURE_2D, textureProps.__webglTexture!)
+    this.setTextureParameters(gl.TEXTURE_2D, texture)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      this.getInternalFormat(texture),
+      renderTarget.width,
+      renderTarget.height,
+      0,
+      this.formatToGL(texture.format),
+      this.typeToGL(texture.type),
+      null,
+    )
+    gl.bindTexture(gl.TEXTURE_2D, null)
+
+    // 2. 创建 framebuffer 并挂 color attachment
+    rtProps.__webglFramebuffer = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, rtProps.__webglFramebuffer)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textureProps.__webglTexture!, 0)
+
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER)
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      console.warn(`[LKA] WebGLTextures: Framebuffer incomplete (status 0x${status.toString(16)}).`)
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
+  /**
+   * 获取 RenderTarget 的 framebuffer 句柄，供 renderer 绑定
+   */
+  getFramebuffer(renderTarget: RenderTargetLike): WebGLFramebuffer | null {
+    return this.properties.get<RenderTargetProperties>(renderTarget).__webglFramebuffer ?? null
+  }
+
+  /**
+   * 释放 RenderTarget 的 framebuffer / color 纹理
+   */
+  disposeRenderTarget(renderTarget: RenderTargetLike): void {
+    const gl = this.gl
+    const rtProps = this.properties.get<RenderTargetProperties>(renderTarget)
+
+    if (rtProps.__webglDisposeListener === true) {
+      renderTarget.removeEventListener('dispose', this.onRenderTargetDispose)
+    }
+
+    if (rtProps.__webglFramebuffer !== undefined) {
+      gl.deleteFramebuffer(rtProps.__webglFramebuffer)
+    }
+
+    this.properties.remove(renderTarget)
+    this.dispose(renderTarget.texture)
   }
 
   // ===== 上传 =====
@@ -129,7 +277,7 @@ export class WebGLTextures {
     const gl = this.gl
 
     // 1. 创建/复用 WebGLTexture
-    this.initTexture(textureProps)
+    this.initTexture(texture, textureProps)
 
     // 2. 绑定
     gl.activeTexture(gl.TEXTURE0 + slot)
@@ -188,9 +336,15 @@ export class WebGLTextures {
 
   // ===== WebGLTexture 生命周期 =====
 
-  private initTexture(textureProps: TextureProperties): void {
+  private initTexture(texture: Texture, textureProps: TextureProperties): void {
+    if (textureProps.__webglDisposeListener !== true) {
+      texture.addEventListener('dispose', this.onTextureDispose)
+      textureProps.__webglDisposeListener = true
+    }
+
     if (textureProps.__webglTexture === undefined) {
       textureProps.__webglTexture = this.gl.createTexture()!
+      this.info.memory.textures++
     }
   }
 
