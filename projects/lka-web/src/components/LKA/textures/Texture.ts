@@ -128,6 +128,14 @@ export class Texture extends EventDispatcher<TextureEventMap> {
     )
   }
 
+  setImage(image: SourceData): this {
+    this.image = image
+    this.source.dataReady = image !== null
+    this.markNeedsUpdate()
+
+    return this
+  }
+
   /**
    * 标记纹理需要重新配置/上传，同时标记 source 需要重新上传数据
    */

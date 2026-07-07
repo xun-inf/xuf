@@ -35,32 +35,28 @@ export class RenderTarget extends EventDispatcher<RenderTargetEventMap> {
   /** color attachment，可作为普通纹理被采样 */
   texture: Texture
 
+  /** 备用 color attachment，用于 ping-pong 双纹理 */
+  private _swapTexture: Texture | null = null
+
   constructor(width = 1, height = 1, options: RenderTargetOptions = {}) {
     super()
 
     this.width = width
     this.height = height
+    this.texture = this.createTexture(options)
+  }
 
-    const texture = new Texture(
-      null,
-      undefined,
-      options.wrapS ?? ClampToEdgeWrapping,
-      options.wrapT ?? ClampToEdgeWrapping,
-      options.magFilter ?? LinearFilter,
-      options.minFilter ?? LinearFilter,
-      options.format ?? RGBAFormat,
-      options.type ?? UByteType,
-    )
+  /**
+   * 交换当前 color attachment 与备用纹理，返回交换前的纹理供后续 pass 采样。
+   */
+  swap(): Texture {
+    const texture = this.texture
+    const swapTexture = this._swapTexture ?? this.createTextureFrom(texture)
 
-    // RenderTarget 纹理默认不生成 mipmap
-    texture.generateMipmaps = options.generateMipmaps ?? false
-    texture.flipY = false
+    this.texture = swapTexture
+    this._swapTexture = texture
 
-    // 只分配 GPU 显存，不上传数据
-    texture.source.dataReady = false
-    texture.isRenderTargetTexture = true
-
-    this.texture = texture
+    return texture
   }
 
   setSize(width: number, height: number): void {
@@ -75,5 +71,54 @@ export class RenderTarget extends EventDispatcher<RenderTargetEventMap> {
 
   dispose(): void {
     this.dispatchEvent('dispose', {})
+
+    if (this._swapTexture !== null) {
+      this._swapTexture.dispose()
+      this._swapTexture = null
+    }
+  }
+
+  private createTexture(options: RenderTargetOptions): Texture {
+    const texture = new Texture(
+      null,
+      undefined,
+      options.wrapS ?? ClampToEdgeWrapping,
+      options.wrapT ?? ClampToEdgeWrapping,
+      options.magFilter ?? LinearFilter,
+      options.minFilter ?? LinearFilter,
+      options.format ?? RGBAFormat,
+      options.type ?? UByteType,
+    )
+
+    texture.generateMipmaps = options.generateMipmaps ?? false
+    texture.flipY = false
+    texture.source.dataReady = false
+    texture.isRenderTargetTexture = true
+
+    return texture
+  }
+
+  private createTextureFrom(reference: Texture): Texture {
+    const texture = new Texture(
+      null,
+      reference.mapping,
+      reference.wrapS,
+      reference.wrapT,
+      reference.magFilter,
+      reference.minFilter,
+      reference.format,
+      reference.type,
+      reference.anisotropy,
+      reference.colorSpace,
+    )
+
+    texture.generateMipmaps = reference.generateMipmaps
+    texture.premultiplyAlpha = reference.premultiplyAlpha
+    texture.flipY = false
+    texture.unpackAlignment = reference.unpackAlignment
+    texture.source.dataReady = false
+    texture.isRenderTargetTexture = true
+
+    return texture
   }
 }

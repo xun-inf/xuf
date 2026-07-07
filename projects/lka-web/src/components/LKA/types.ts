@@ -89,7 +89,7 @@ export interface EffectsProps {
   }
 }
 
-export interface LayerProps {
+export interface LayerBaseProps {
   id: number
   type: string
   name?: string
@@ -111,8 +111,6 @@ export interface LayerProps {
   endMode?: number
   compDuration?: number
   compFrameRate?: number
-
-  [key: string]: any // 兼容其他类型
 }
 
 export type ImageProps = {
@@ -241,6 +239,22 @@ export type CameraProps = {
     }[]
   }
 }
+
+export type LayerProps = LayerBaseProps &
+  (
+    | ImageProps
+    | VideoProps
+    | LayerTextProps
+    | ShapeProps
+    | SolidProps
+    | PathProps
+    | RectProps
+    | EllipseProps
+    | SolidProps
+    | VectorProps
+    | CameraProps
+    | {type: 'precomposition'}
+  )
 
 export interface LkaPlayProps {
   width: number

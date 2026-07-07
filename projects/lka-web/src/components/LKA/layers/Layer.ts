@@ -1,24 +1,62 @@
 import {Object3D} from '../core/Object3D'
-import {Drawer} from './Drawer'
+import {LayerProps} from '../types'
+import {DrawerConstructor, DrawerLike} from './Drawer'
+import { ImageDrawer } from './ImageDrawer'
+import {LayerView} from './LayerView'
+import { TextDrawer } from './TextDrawer'
+import { VectorDrawer } from './VectorDrawer'
 
-class Layer<D extends Drawer = Drawer> extends Object3D {
-  constructor() {
+export class Layer<D extends DrawerLike = DrawerLike> extends Object3D {
+  constructor(props: LayerProps, layerView: LayerView, DrawerClass: DrawerConstructor<D>) {
     super()
+
+    this.props = props
+    this.layerView = layerView
+    this._drawer = new DrawerClass(layerView.renderer, layerView.state)
   }
 
-  protected drawer_: D | null = null
+  readonly props: LayerProps
+  readonly layerView: LayerView
+  private _drawer: D
 
-  get drawer() {
-    return this.drawer_
+  async init() {
+    await this._drawer.init()
   }
 
-  setDrawer(d: D) {
-    this.drawer_?.despose()
+  render() {}
 
-    this.drawer_ = d
+  dispose() {
+    this._drawer.dispose()
   }
-
-  despose() {}
 }
 
-export {Layer}
+export const createLayer = (props: LayerProps, layerView: LayerView) => {
+  // 预合成处理
+  if (props.type === 'precomposition') {
+    const compProps = layerView.state.getCompLayerProps(props.id)
+    if (compProps) {
+      const {id, sourceId, type, ...other} = props
+      props = {...compProps, ...other, id, sourceId}
+    }
+  }
+  switch (props.type) {
+    case 'text':
+      return new Layer(props, layerView, TextDrawer)
+    case 'image':
+      return new Layer(props, layerView, ImageDrawer)
+    case 'video':
+      return new Layer(props, layerView, ImageDrawer)
+    case 'Solid':
+      return new Layer(props, layerView, ImageDrawer)
+    case 'vector':
+      return new Layer(props, layerView, VectorDrawer)
+    case 'ShapeLayer':
+      return new Layer(props, layerView, ImageDrawer)
+    // case 'Rect':
+    //   break
+    // case 'Ellipse':
+    //   break
+    // case 'Path':
+    //   break
+  }
+}

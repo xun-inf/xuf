@@ -1,9 +1,13 @@
-import { Camera } from '../cameras/Camera'
-import { Object3D } from '../core/Object3D'
+import {Camera} from '../cameras/Camera'
+import {Object3D} from '../core/Object3D'
+import {RenderTarget} from '../core/RenderTarget'
 import {Vector4} from '../math/Vector4'
+import type {Texture} from '../textures/Texture'
 import {createCanvasElement} from '../utils'
-import {WebGLRenderTarget} from './WebGLRenderTarget'
+import type {BuiltShader} from './shaders/ShaderBuilder'
+import {WebGLAttributes, type WebGLAttributeInfo} from './webgl/WebGLAttributes'
 import {WebGLInfo} from './webgl/WebGLInfo'
+import {WebGLPrograms} from './webgl/WebGLPrograms'
 import {WebGLState} from './webgl/WebGLState'
 import {WebGLTextures} from './webgl/WebGLTextures'
 
@@ -19,6 +23,15 @@ export interface WebGLRendererParameters {
    * default is true.
    */
   premultipliedAlpha?: boolean
+}
+
+export interface WebGLDrawParameters {
+  shader: BuiltShader
+  attributes: Record<string, WebGLAttributeInfo>
+  uniforms?: Record<string, unknown>
+  mode?: number
+  first?: number
+  count: number
 }
 
 export class WebGLRenderer {
@@ -46,6 +59,8 @@ export class WebGLRenderer {
 
     this.info = new WebGLInfo(this._gl)
     this._state = new WebGLState(this._gl)
+    this._programs = new WebGLPrograms(this._gl, this.info)
+    this._attributes = new WebGLAttributes(this._gl, this.info)
     this._textures = new WebGLTextures(this._gl, this.info)
 
     this.initGLContext()
@@ -56,6 +71,8 @@ export class WebGLRenderer {
 
   private _gl: WebGL2RenderingContext
   private _state: WebGLState
+  private _programs: WebGLPrograms
+  private _attributes: WebGLAttributes
   private _textures: WebGLTextures
   private _isContextLost = false
   private _width: number
@@ -63,7 +80,7 @@ export class WebGLRenderer {
   private _pixelRatio: number
   private _viewport: Vector4
   /** 当前绑定的离屏渲染目标，null 表示默认帧缓冲（canvas） */
-  private _currentRenderTarget: WebGLRenderTarget | null = null
+  private _currentRenderTarget: RenderTarget | null = null
 
   getContext() {
     return this._gl
@@ -99,7 +116,7 @@ export class WebGLRenderer {
   /**
    * 设置渲染目标：传入 RenderTarget 则渲染到其 framebuffer，传 null 恢复到 canvas。
    */
-  setRenderTarget(renderTarget: WebGLRenderTarget | null): void {
+  setRenderTarget(renderTarget: RenderTarget | null): void {
     const gl = this._gl
     this._currentRenderTarget = renderTarget
 
@@ -114,12 +131,30 @@ export class WebGLRenderer {
     }
   }
 
-  getRenderTarget(): WebGLRenderTarget | null {
+  getRenderTarget(): RenderTarget | null {
     return this._currentRenderTarget
+  }
+
+  swapRenderTarget(renderTarget = this._currentRenderTarget): Texture | null {
+    if (renderTarget === null) return null
+
+    const texture = renderTarget.swap()
+    this._textures.updateRenderTarget(renderTarget)
+
+    if (renderTarget === this._currentRenderTarget) {
+      this._state.reset()
+      this.setRenderTarget(renderTarget)
+    }
+
+    return texture
   }
 
   getState(): WebGLState {
     return this._state
+  }
+
+  setTexture2D(texture: Texture, slot = 0): void {
+    this._textures.setTexture2D(texture, slot)
   }
 
   clear(color = true, depth = false, stencil = false): void {
@@ -128,6 +163,9 @@ export class WebGLRenderer {
 
   dispose() {
     const canvas = this.canvas
+
+    this._attributes.dispose()
+    this._programs.dispose()
 
     canvas.removeEventListener('webglcontextlost', this.onContextLost, false)
     canvas.removeEventListener('webglcontextrestored', this.onContextRestore, false)

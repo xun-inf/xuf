@@ -117,7 +117,13 @@ export class WebGLState {
 
   blendFuncSeparate(srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number): void {
     const current = this.currentBlendFuncSeparate
-    if (current !== null && current[0] === srcRGB && current[1] === dstRGB && current[2] === srcAlpha && current[3] === dstAlpha) {
+    if (
+      current !== null &&
+      current[0] === srcRGB &&
+      current[1] === dstRGB &&
+      current[2] === srcAlpha &&
+      current[3] === dstAlpha
+    ) {
       return
     }
 

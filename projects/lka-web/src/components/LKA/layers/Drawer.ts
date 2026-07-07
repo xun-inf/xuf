@@ -1,7 +1,25 @@
-class Drawer {
-  constructor() {}
+import {PlayerState} from '../PlayerState'
+import {WebGLRenderer} from '../renderers/WebGLRenderer'
 
-  despose() {}
+export interface DrawerLike {
+  init(): Promise<void>
+
+  draw(): void
+
+  dispose(): void
 }
 
-export {Drawer}
+export abstract class Drawer implements DrawerLike {
+  constructor() {}
+
+  abstract init(): Promise<void>
+
+  abstract draw(): void
+
+  dispose() {}
+}
+
+export type DrawerConstructor<D extends DrawerLike = DrawerLike> = new (
+  renderer: WebGLRenderer,
+  state: PlayerState
+) => D

@@ -1,4 +1,5 @@
 import {ClampToEdgeWrapping, NearestFilter, RGBAFormat, UByteType, UVMapping} from '../constants'
+import type {TextureData} from './Source'
 import {Texture} from './Texture'
 
 /**
@@ -23,11 +24,18 @@ export class DataTexture extends Texture {
   ) {
     super(null, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy, colorSpace)
 
-    // 结构化数据对象
-    this.image = {data, width, height} as unknown as HTMLImageElement
+    this.setData(data, width, height)
 
     this.generateMipmaps = false
     this.flipY = false // 数据纹理无需 Y 翻转
     this.unpackAlignment = 1 // 数据紧密排列
+  }
+
+  setData(data: ArrayBufferView | null, width: number, height: number): this {
+    this.image = {data, width, height} satisfies TextureData
+    this.source.dataReady = data !== null
+    this.markNeedsUpdate()
+
+    return this
   }
 }

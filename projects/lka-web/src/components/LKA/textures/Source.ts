@@ -7,7 +7,7 @@ let _sourceId = 0
  * DataTexture 使用的结构化数据形态
  */
 export interface TextureData {
-  data: ArrayBufferView
+  data: ArrayBufferView | null
   width: number
   height: number
   depth?: number

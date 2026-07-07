@@ -35,6 +35,7 @@ import {Vector3} from '../../math/Vector3'
 import type {Texture} from '../../textures/Texture'
 import type {DataTexture} from '../../textures/DataTexture'
 import type {VideoTexture} from '../../textures/VideoTexture'
+import {RenderTarget} from '../../core/RenderTarget'
 import type {TextureData} from '../../textures/Source'
 import {WebGLExtensions} from './WebGLExtensions'
 import type {WebGLInfo} from './WebGLInfo'
@@ -48,14 +49,6 @@ interface TextureProperties extends Record<string, unknown> {
 interface RenderTargetProperties extends Record<string, unknown> {
   __webglFramebuffer?: WebGLFramebuffer
   __webglDisposeListener?: true
-}
-
-interface RenderTargetLike {
-  width: number
-  height: number
-  texture: Texture
-  addEventListener(type: 'dispose', listener: (event: {target: RenderTargetLike | null}) => void): void
-  removeEventListener(type: 'dispose', listener: (event: {target: RenderTargetLike | null}) => void): void
 }
 
 const _size = /*@__PURE__*/ new Vector3()
@@ -109,7 +102,7 @@ export class WebGLTextures {
     this.dispose(texture)
   }
 
-  private onRenderTargetDispose = (event: {target: RenderTargetLike | null}): void => {
+  private onRenderTargetDispose = (event: {target: RenderTarget | null}): void => {
     const renderTarget = event.target
     if (renderTarget === null) return
 
@@ -201,7 +194,7 @@ export class WebGLTextures {
    * 为 RenderTarget 分配 color 纹理显存并创建 framebuffer，幂等。
    * Framebuffer 句柄挂在 RenderTarget 的 properties 上，而非 Texture。
    */
-  setupRenderTarget(renderTarget: RenderTargetLike): void {
+  setupRenderTarget(renderTarget: RenderTarget): void {
     const gl = this.gl
     const rtProps = this.properties.get<RenderTargetProperties>(renderTarget)
 
@@ -246,16 +239,52 @@ export class WebGLTextures {
   }
 
   /**
+   * 重新将 RenderTarget 当前 texture 挂到 framebuffer，用于 ping-pong swap。
+   */
+  updateRenderTarget(renderTarget: RenderTarget): void {
+    const gl = this.gl
+    const rtProps = this.properties.get<RenderTargetProperties>(renderTarget)
+
+    if (rtProps.__webglFramebuffer === undefined) {
+      this.setupRenderTarget(renderTarget)
+      return
+    }
+
+    const texture = renderTarget.texture
+    const textureProps = this.properties.get<TextureProperties>(texture)
+
+    this.initTexture(texture, textureProps)
+    gl.bindTexture(gl.TEXTURE_2D, textureProps.__webglTexture!)
+    this.setTextureParameters(gl.TEXTURE_2D, texture)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      this.getInternalFormat(texture),
+      renderTarget.width,
+      renderTarget.height,
+      0,
+      this.formatToGL(texture.format),
+      this.typeToGL(texture.type),
+      null,
+    )
+    gl.bindTexture(gl.TEXTURE_2D, null)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, rtProps.__webglFramebuffer)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textureProps.__webglTexture!, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
+  /**
    * 获取 RenderTarget 的 framebuffer 句柄，供 renderer 绑定
    */
-  getFramebuffer(renderTarget: RenderTargetLike): WebGLFramebuffer | null {
+  getFramebuffer(renderTarget: RenderTarget): WebGLFramebuffer | null {
     return this.properties.get<RenderTargetProperties>(renderTarget).__webglFramebuffer ?? null
   }
 
   /**
    * 释放 RenderTarget 的 framebuffer / color 纹理
    */
-  disposeRenderTarget(renderTarget: RenderTargetLike): void {
+  disposeRenderTarget(renderTarget: RenderTarget): void {
     const gl = this.gl
     const rtProps = this.properties.get<RenderTargetProperties>(renderTarget)
 
@@ -296,12 +325,16 @@ export class WebGLTextures {
     // 4. 采样参数
     this.setTextureParameters(gl.TEXTURE_2D, texture)
 
-    // 5. 上传像素数据（仅在 source 标记需要更新时）
-    if (needsUpload && source.dataReady) {
-      this.uploadPixels(texture)
+    // 5. 上传像素数据。DataTexture 支持 data=null，只分配显存不上传像素。
+    if (needsUpload) {
+      const isDataTexture = (texture as DataTexture).isDataTexture
 
-      if (texture.generateMipmaps && this.canGenerateMipmaps(texture)) {
-        gl.generateMipmap(gl.TEXTURE_2D)
+      if (source.dataReady || isDataTexture) {
+        this.uploadPixels(texture)
+
+        if (texture.generateMipmaps && this.canGenerateMipmaps(texture)) {
+          gl.generateMipmap(gl.TEXTURE_2D)
+        }
       }
 
       source.needsUpdate = false

@@ -1,9 +1,26 @@
-import {PlayerParameters, LkaPlayProps} from './types'
+import {WebGLRenderer} from './renderers/WebGLRenderer'
+import {PlayerParameters} from './types'
+import {PlayerState} from './PlayerState'
+import {LkaRenderView} from './views/LkaRenderView'
 
 class LkaPlayer {
-  constructor(container: HTMLElement, parameters: PlayerParameters) {}
+  private renderer: WebGLRenderer
+  private state: PlayerState
+  private renderView: LkaRenderView
 
-  async load(props: {file: ArrayBufferLike | string; mockJson?: LkaPlayProps}) {}
+  constructor(container: HTMLElement, parameters: PlayerParameters) {
+    const canvas = document.createElement('canvas')
+    canvas.style.cssText = `width:100%; height:100%;`
+    container.appendChild(canvas)
+
+    this.state = new PlayerState(parameters)
+    this.renderer = new WebGLRenderer({canvas, alpha: true, premultipliedAlpha: true})
+    this.renderView = new LkaRenderView(this.renderer, this.state)
+  }
+
+  async load(props: {file: ArrayBufferLike | string}) {
+    await this.renderView.load(props)
+  }
 
   play() {}
 
@@ -11,7 +28,9 @@ class LkaPlayer {
 
   pause() {}
 
-  resizeCanvasToDisplaySize() {}
+  seek(frameId: number) {}
+
+  resizeCanvasToDisplaySize(width = 0, height = 0) {}
 
   async grap(x: number, y: number) {}
 
